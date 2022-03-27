@@ -1,0 +1,217 @@
+###### This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+
+# Import libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import missingno as msno
+import datetime as dt
+import tensorflow as tf
+import statsmodels.api as sm
+from pandas import DataFrame , concat
+from sklearn.metrics import mean_absolute_error , mean_squared_error
+%matplotlib inline
+%config InlineBackend.figure_format = 'retina'
+from math import sqrt
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense,LSTM,Activation
+from numpy import array , hstack
+from tensorflow import keras
+
+#import Data To dataframes
+import io
+df1 = pd.read_csv('/kaggle/input/data-storm/train_data.csv')
+
+# Print the header of the DataFrame
+df1.head()
+
+# Print info of DataFrame
+#form this we can get an idea that CategoryCode and DateID both are in object data type
+df1.info()
+
+# Print description of DataFrame
+df1.DailySales.describe()
+
+#to count how many unique items in the list
+len(df1['ItemCode'].unique())
+
+#to view unique item codes
+df1['ItemCode'].value_counts()
+
+# Visualize the distribution of the DailySales column
+sns.distplot(df1['DailySales'],bins=50)
+plt.title('Distribution of listing DailySales')
+plt.show()
+
+
+# Box Plot
+#from this we can identify the outliers and arrangement of daily sales data set
+sns.boxplot(df1['DailySales'])
+
+#since daily sales show a drastic deviation beyond 180 its better to remove rows which have Daily sales greater than 180
+# Position of the Outlier
+# From this we could get an idea that data rows which has daily sales greater than 180 is very low 
+# Hence removing them would  not affect the original data set 
+print(np.where(df1['DailySales']>180))
+
+# Writing new dataframe to store filted data
+df2 = df1.loc[df1["DailySales"] <180 ]
+
+
+# Position of the Outlier
+# When you run this code you will get a empty array proving that rows with Daily Sales greater than 180 is omited from the data frame 
+print(np.where(df2['DailySales']>180))
+
+# Box Plot
+# This will show that new data set contains no  outliers compared to the original data set
+sns.boxplot(df2['DailySales'])
+
+# Print info of DataFrame
+# From this you can compare how many rows got omited from the original data set
+# Since 10 is neglegible when compared to 19921 this omition wont affect the analysis 
+df1.info()
+df2.info()
+
+# The DateID column should be converted to Date time format
+# Convert DateID columns to datetime
+df2['DateID'] = pd.to_datetime(df2['DateID'], format = '%m/%d/%Y')
+
+# Print the header of the DataFrame
+# Getting a birdsview of the modified data set
+df2.head()
+
+# The time duration should be from 1st of October 2021 to 13th of February 2022
+# The rows that contain dates other than this date duration should be removed from the data set
+start_date = '2021-10-01'
+end_date = '2022-02-13'
+mask = (df2['DateID'] > start_date) & (df2['DateID'] <= end_date)
+df3 = df2.loc[mask]
+display(df3)
+
+# Print info of DataFrame
+df2.info()
+df3.info()
+
+# Checking a how many data sets are there for category types 
+df3['CategoryCode'].value_counts()
+
+df3['ItemCode'].value_counts()
+
+#to plot data of Daily Sales and Date
+uni_data = df3['DailySales']
+uni_data.index = df3['DateID']
+uni_data.head()
+# shows that data set has a high variation 
+# min max noramalization technique should be applied as a solution 
+uni_data.plot()
+
+# copy the data
+df_min_max_scaled = df3.copy()
+  
+# apply normalization techniques (Min Max Normalization)
+for column in df_min_max_scaled.columns:
+    df_min_max_scaled['DailySales'] = (df_min_max_scaled['DailySales'] - df_min_max_scaled['DailySales'].min()) / (df_min_max_scaled['DailySales'].max() - df_min_max_scaled['DailySales'].min())    
+
+# view normalized data
+print(df_min_max_scaled)
+
+# To find the correlation among
+# the columns using pearson method
+df_min_max_scaled.corr(method ='pearson')
+
+# Print info of DataFrame
+df_min_max_scaled.info()
+
+
+# Getting columns into seperate variables 
+DateID_1 = df_min_max_scaled['DateID']
+CategoryCode_1 = df_min_max_scaled['CategoryCode']
+ItemCode_1    = df_min_max_scaled['ItemCode']
+DailySales_1    = df_min_max_scaled['DailySales']
+DailySales_1  = DailySales_1.values
+
+# Convering data into data arrays
+from numpy import array
+DateID_1 = array([DateID_1])
+CategoryCode_1 = array([CategoryCode_1])
+ItemCode_1 = array([ItemCode_1])
+DailySales_1 = array([DailySales_1])
+
+# convert to [rows, columns] structure
+DateID_1 = DateID_1.reshape((19768, 1))
+CategoryCode_1 = CategoryCode_1.reshape((19768, 1))
+ItemCode_1 = ItemCode_1.reshape((19768, 1))
+DailySales_1 = DailySales_1.reshape((19768, 1))
+
+print ("DateID_1.shape" , DateID_1.shape) 
+print ("CategoryCode_1.shape" , CategoryCode_1.shape) 
+print ("ItemCode_1.shape" , ItemCode_1.shape) 
+print ("DailySales_1.shape" , DailySales_1.shape) 
+
+# horizontally stack columns
+dataset_stacked = hstack((DateID_1, CategoryCode_1, ItemCode_1,  DailySales_1))
+
+print ("dataset_stacked.shape" , dataset_stacked.shape) 
+
+# split a multivariate sequence into samples
+def split_sequences(sequences, n_steps_in, n_steps_out):
+	DateID_1, CategoryCode_1,ItemCode_1 ,DailySales_1 = list(), list(), list(), list()
+	for i in range(len(sequences)):
+		# find the end of this pattern
+		end_ix = i + n_steps_in
+		out_end_ix = end_ix + n_steps_out-1
+		# check if we are beyond the dataset
+		if out_end_ix > len(sequences):
+			break
+		# gather input and output parts of the pattern
+		seq_DateID_1, seq_CategoryCode_1, seq_ItemCode_1, seq_DailySales_1 = sequences[i:end_ix, :-1],sequences[i:end_ix, :-1],sequences[i:end_ix, :-1], sequences[end_ix-1:out_end_ix, -1]
+		DateID_1.append(seq_DateID_1), CategoryCode_1.append(seq_CategoryCode_1), ItemCode_1.append(seq_ItemCode_1)
+		DailySales_1.append(seq_DailySales_1)
+	return array(DateID_1), array(CategoryCode_1), array(ItemCode_1), array(DailySales_1)
+
+# choose a number of time steps #change this accordingly
+n_steps_in, n_steps_out = 60 , 30 
+
+# covert into input/output
+DateID_1,CategoryCode_1,ItemCode_1, DailySales_1 = split_sequences(dataset_stacked, n_steps_in, n_steps_out)
+
+print ("DateID_1.shape" , DateID_1.shape) 
+print ("CategoryCode_1.shape" , CategoryCode_1.shape) 
+print ("ItemCode_1.shape" , ItemCode_1.shape) 
+print ("DailySales_1.shape" , DailySales_1.shape) 
+
+# initializing train data
+train_DateID , train_CategoryCode, train_ItemCode, train_DailySales = DateID_1[:19680, :] , CategoryCode_1[:19680, :], ItemCode_1[:19680, :], DailySales_1[:19680, :]
+
+n_features = train_DateID.shape[2]
+
+# Since for sales it affect previous days sales we could use recurring neural network model
+# And LSTM multivariate time series model is chosen as the model 
+#optimizer learning rate
+opt = keras.optimizers.Adam(learning_rate=0.01)
+
+# define model
+model = Sequential()
+model.add(LSTM(50, activation='relu', return_sequences=True, input_shape=(n_steps_in, n_features)))
+model.add(LSTM(50, activation='relu'))
+model.add(Dense(n_steps_out))
+model.add(Activation('linear'))
+model.compile(loss='mse' , optimizer=opt , metrics=['mse'])
